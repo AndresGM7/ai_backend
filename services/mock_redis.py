@@ -8,12 +8,54 @@ from datetime import datetime, timedelta
 
 
 class MockRedis:
-    """Mock de Redis para desarrollo local"""
+    """Mock de Redis para desarrollo local - Soporta operaciones síncronas y asíncronas"""
 
     def __init__(self):
         self._data: Dict[str, Any] = {}
         self._expiry: Dict[str, datetime] = {}
 
+    # Métodos síncronos para compatibilidad con redis-py
+    def ping(self) -> bool:
+        """Simula ping de Redis (síncrono)"""
+        return True
+
+    def set(self, key: str, value: Any, ex: Optional[int] = None) -> bool:
+        """Simula SET de Redis (síncrono)"""
+        self._data[key] = value
+        if ex:
+            self._expiry[key] = datetime.now() + timedelta(seconds=ex)
+        return True
+
+    def setex(self, key: str, time: int, value: Any) -> bool:
+        """Simula SETEX de Redis (síncrono)"""
+        self._data[key] = value
+        self._expiry[key] = datetime.now() + timedelta(seconds=time)
+        return True
+
+    def get(self, key: str) -> Optional[str]:
+        """Simula GET de Redis (síncrono)"""
+        if key in self._expiry and datetime.now() > self._expiry[key]:
+            del self._data[key]
+            del self._expiry[key]
+            return None
+        return self._data.get(key)
+
+    def delete(self, key: str) -> int:
+        """Simula DELETE de Redis (síncrono)"""
+        if key in self._data:
+            del self._data[key]
+            if key in self._expiry:
+                del self._expiry[key]
+            return 1
+        return 0
+
+    def keys(self, pattern: str) -> List[str]:
+        """Simula KEYS de Redis (síncrono)"""
+        import re
+        pattern_regex = pattern.replace('*', '.*')
+        return [k for k in self._data.keys() if re.match(pattern_regex, k)]
+
+    # Métodos asíncronos para compatibilidad con redis.asyncio
     async def ping(self) -> bool:
         """Simula ping de Redis"""
         return True
@@ -79,4 +121,3 @@ class MockRedis:
 async def get_mock_redis():
     """Retorna una instancia de MockRedis"""
     return MockRedis()
-

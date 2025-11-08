@@ -2,6 +2,8 @@
 import logging
 from fastapi import FastAPI
 
+from api.routes import chat
+
 # Logger básico (JSON logs más adelante)
 logger = logging.getLogger("ai_backend")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -12,6 +14,9 @@ app = FastAPI(
     version="0.1.0"
 )
 
+# Incluir router de chat
+app.include_router(chat.router, prefix="/api", tags=["Chat"])
+
 
 @app.get("/status")
 async def status():
@@ -20,5 +25,6 @@ async def status():
     return {
         "status": "ok",
         "message": "Server running asynchronously",
-        "project": "Price Optimization System"
+        "project": "Price Optimization System",
+        "day": "2 - Redis Session Management"
     }

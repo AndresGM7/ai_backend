@@ -111,6 +111,11 @@ poetry run pytest tests/test_pricing.py -v
 ### Status
 - `GET /status` - Verificar estado del servidor
 
+### Chat & Session Management (Día 2)
+- `POST /api/chat/{user_id}` - Enviar mensaje y guardar en sesión
+- `GET /api/chat/{user_id}/history` - Obtener historial de conversación
+- `DELETE /api/chat/{user_id}/history` - Limpiar historial de usuario
+
 ### Optimización de Precios (próximamente)
 - `POST /api/optimize-price` - Calcular precio óptimo
 - `GET /api/elasticity/{product_id}` - Obtener elasticidad de producto
@@ -118,10 +123,53 @@ poetry run pytest tests/test_pricing.py -v
 
 ---
 
+## 💾 Session Management con Redis
+
+### Arquitectura de Sesiones
+
+El sistema implementa gestión de sesiones con Redis para mantener el contexto de conversación:
+
+**Características:**
+- ✅ **Persistencia**: Historial de mensajes por usuario
+- ✅ **TTL Automático**: Sesiones expiran en 1 hora (3600 segundos)
+- ✅ **Almacenamiento JSON**: Datos serializados para flexibilidad
+- ✅ **Fallback a MockRedis**: Funciona sin Docker
+
+**Estructura de Sesión:**
+```json
+{
+  "history": [
+    {
+      "role": "user",
+      "text": "¿Cuál es el precio óptimo?"
+    }
+  ]
+}
+```
+
+**Seguridad:**
+- Session keys por `user_id`
+- TTL para limpieza automática
+- Sin datos sensibles en sesión
+- Aislamiento por usuario
+
+**Ejemplo de uso:**
+```bash
+# Enviar mensaje
+curl -X POST "http://localhost:8000/api/chat/user123" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hola, necesito ayuda con precios"}'
+
+# Obtener historial
+curl "http://localhost:8000/api/chat/user123/history"
+```
+
+---
+
 ## 🎯 Roadmap Semana 1
 
 - [x] **Día 1**: Setup inicial + endpoint `/status`
-- [ ] **Día 2**: Endpoint `/optimize-price` con validación Pydantic
+- [x] **Día 2**: Redis sessions + endpoint `/chat/{user_id}`
 - [ ] **Día 3**: Integración Redis + caching
 - [ ] **Día 4**: Tests completos + CI/CD
 - [ ] **Día 5**: Logging estructurado + métricas
