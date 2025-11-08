@@ -1,6 +1,6 @@
 """Chat routes - Día 2: Session management con Redis."""
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import logging
 
 from services.redis_manager import save_session, get_session
@@ -13,12 +13,13 @@ class ChatMessage(BaseModel):
     """Modelo para mensaje de chat."""
     message: str
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "¿Cuál es el precio óptimo para mi producto?"
             }
         }
+    )
 
 
 @router.post("/chat/{user_id}")
@@ -116,4 +117,3 @@ async def clear_chat_history(user_id: str):
     except Exception as e:
         logger.error(f"Error clearing history: {e}")
         raise HTTPException(status_code=500, detail=f"Error al limpiar historial: {str(e)}")
-

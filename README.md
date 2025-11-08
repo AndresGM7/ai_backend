@@ -116,6 +116,10 @@ poetry run pytest tests/test_pricing.py -v
 - `GET /api/chat/{user_id}/history` - Obtener historial de conversación
 - `DELETE /api/chat/{user_id}/history` - Limpiar historial de usuario
 
+### Streaming (Día 3) 🆕
+- `GET /api/stream` - Demo de streaming texto
+- `GET /api/stream-json` - Streaming de eventos JSON (SSE)
+
 ### Optimización de Precios (próximamente)
 - `POST /api/optimize-price` - Calcular precio óptimo
 - `GET /api/elasticity/{product_id}` - Obtener elasticidad de producto
@@ -170,9 +174,9 @@ curl "http://localhost:8000/api/chat/user123/history"
 
 - [x] **Día 1**: Setup inicial + endpoint `/status`
 - [x] **Día 2**: Redis sessions + endpoint `/chat/{user_id}`
-- [ ] **Día 3**: Integración Redis + caching
-- [ ] **Día 4**: Tests completos + CI/CD
-- [ ] **Día 5**: Logging estructurado + métricas
+- [x] **Día 3**: Streaming + Logging JSON + Tests completos
+- [ ] **Día 4**: Validación Pydantic avanzada + OpenAPI mejorado
+- [ ] **Día 5**: Performance monitoring + Benchmarks
 
 ---
 
