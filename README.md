@@ -1,6 +1,5 @@
 # 🎯 Sistema de Optimización de Precios con IA
 
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -31,7 +30,7 @@
 1. **Clonar el repositorio**
    ```bash
    git clone <tu-repo>
-   cd ai_backend
+   git clone https://github.com/andresgiraldo/ai_backend.git
    ```
 
 2. **Instalar dependencias**
@@ -153,8 +152,10 @@ Objetivo: API profesional, testeada y versionada para portfolio
 
 **Andrés Giraldo**
 - Portfolio: [Tu portfolio]
-- LinkedIn: [Tu LinkedIn]
-- GitHub: [Tu GitHub]
+- Portfolio: https://andresgiraldo.dev (o tu URL de portfolio)
+- LinkedIn: https://linkedin.com/in/andres-giraldo
+- GitHub: https://github.com/andresgiraldo
+- Email: andres.giraldo@example.com
 
 ---
 
