@@ -1,43 +1,27 @@
-"""Chat routes - Día 2: Session management con Redis."""
+"""Chat routes - Día 2/4: Session management con Redis + Pydantic validation."""
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, ConfigDict
 import logging
 
 from services.redis_manager import save_session, get_session
+from models.schemas import ChatRequest, ChatResponse
 
 router = APIRouter()
 logger = logging.getLogger("ai_backend")
 
 
-class ChatMessage(BaseModel):
-    """Modelo para mensaje de chat."""
-    message: str
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "message": "¿Cuál es el precio óptimo para mi producto?"
-            }
-        }
-    )
-
-
-@router.post("/chat/{user_id}")
-async def chat(user_id: str, chat_message: ChatMessage):
+@router.post("/chat/{user_id}", response_model=ChatResponse)
+async def chat(user_id: str, chat_request: ChatRequest):
     """
     Endpoint de chat con persistencia de sesión en Redis.
 
-    Día 2: Implementa session management básico con Redis.
-    - Guarda el historial de conversación por usuario
-    - TTL de 1 hora por sesión
-    - Permite rastrear contexto de conversación
+    Día 4: Añadida validación Pydantic y response model tipado.
 
     Args:
         user_id: Identificador único del usuario
-        chat_message: Mensaje del usuario
+        chat_request: ChatRequest con validación Pydantic
 
     Returns:
-        Respuesta con confirmación y longitud de historial
+        ChatResponse con estructura tipada
     """
     try:
         # Recuperar sesión existente
@@ -47,19 +31,18 @@ async def chat(user_id: str, chat_message: ChatMessage):
         # Agregar mensaje al historial
         session.setdefault("history", []).append({
             "role": "user",
-            "text": chat_message.message
+            "text": chat_request.message
         })
 
         # Guardar sesión actualizada (TTL: 1 hora)
         save_session(user_id, session, ttl=3600)
         logger.info(f"Session saved for user: {user_id}, history length: {len(session['history'])}")
 
-        return {
-            "response": f"Mensaje guardado para usuario {user_id}",
-            "session_len": len(session["history"]),
-            "user_id": user_id,
-            "message_received": chat_message.message
-        }
+        return ChatResponse(
+            response=f"Mensaje guardado para usuario {user_id}",
+            session_len=len(session["history"]),
+            user_id=user_id
+        )
 
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}")

@@ -1,38 +1,40 @@
-"""Pydantic models for request/response validation."""
+"""Pydantic models for request/response validation - Día 4."""
 from typing import List, Optional, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
+
+# ============================================
+# Día 4: Modelos base con validación
+# ============================================
 
 class ChatRequest(BaseModel):
-    """Request model for chat endpoint."""
-    session_id: str = Field(..., description="Unique session identifier")
-    message: str = Field(..., min_length=1, description="User message")
-    system_prompt: Optional[str] = Field(None, description="Optional system prompt")
+    """Request model para chat endpoint - Día 4."""
+    message: str = Field(..., min_length=1, max_length=1000, description="Mensaje del usuario")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
-                "session_id": "user-123-session-1",
-                "message": "What is the capital of France?",
-                "system_prompt": "You are a helpful geography assistant."
+                "message": "¿Cuál es el precio óptimo para mi producto?"
             }
         }
+    )
 
 
 class ChatResponse(BaseModel):
-    """Response model for chat endpoint."""
-    session_id: str = Field(..., description="Session identifier")
-    response: str = Field(..., description="Assistant response")
-    message_count: int = Field(..., description="Total messages in conversation")
+    """Response model para chat endpoint - Día 4."""
+    response: str = Field(..., description="Respuesta del sistema")
+    session_len: int = Field(..., ge=0, description="Longitud del historial de sesión")
+    user_id: str = Field(..., description="ID del usuario")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
-                "session_id": "user-123-session-1",
-                "response": "The capital of France is Paris.",
-                "message_count": 2
+                "response": "Mensaje guardado correctamente",
+                "session_len": 5,
+                "user_id": "user123"
             }
         }
+    )
 
 
 class Message(BaseModel):
@@ -43,22 +45,64 @@ class Message(BaseModel):
 
 class ChatHistoryResponse(BaseModel):
     """Response model for conversation history."""
-    session_id: str = Field(..., description="Session identifier")
+    user_id: str = Field(..., description="Session identifier")
     messages: List[Message] = Field(..., description="Conversation messages")
     message_count: int = Field(..., description="Total message count")
 
-    class Config:
-        json_schema_extra = {
+
+# ============================================
+# Modelos para Optimización de Precios
+# ============================================
+
+class PriceOptimizationRequest(BaseModel):
+    """Request para optimización de precios."""
+    product_id: str = Field(..., description="ID del producto")
+    current_price: float = Field(..., gt=0, description="Precio actual")
+    cost: float = Field(..., gt=0, description="Costo del producto")
+    elasticity: Optional[float] = Field(None, lt=0, description="Elasticidad de precio (negativa)")
+    target_margin: Optional[float] = Field(0.3, ge=0, le=1, description="Margen objetivo (0-1)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
-                "session_id": "user-123-session-1",
-                "messages": [
-                    {"role": "user", "content": "Hello"},
-                    {"role": "assistant", "content": "Hi! How can I help you?"}
-                ],
-                "message_count": 2
+                "product_id": "PROD-001",
+                "current_price": 100.00,
+                "cost": 60.00,
+                "elasticity": -1.5,
+                "target_margin": 0.35
             }
         }
+    )
 
+
+class PriceOptimizationResponse(BaseModel):
+    """Response con precio optimizado."""
+    product_id: str
+    optimal_price: float = Field(..., description="Precio óptimo calculado")
+    current_price: float
+    estimated_demand: Optional[float] = Field(None, description="Demanda estimada")
+    estimated_revenue: Optional[float] = Field(None, description="Revenue estimado")
+    profit_margin: float = Field(..., description="Margen de ganancia (%)")
+    recommendation: str = Field(..., description="Recomendación en lenguaje natural")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "product_id": "PROD-001",
+                "optimal_price": 98.50,
+                "current_price": 100.00,
+                "estimated_demand": 525,
+                "estimated_revenue": 51712.50,
+                "profit_margin": 39.09,
+                "recommendation": "Bajar precio 1.5% aumentará revenue 3.4%"
+            }
+        }
+    )
+
+
+# ============================================
+# Modelos de Sistema
+# ============================================
 
 class HealthResponse(BaseModel):
     """Response model for health check."""
@@ -67,19 +111,22 @@ class HealthResponse(BaseModel):
     service: str
 
 
-# Example structured output model for LLM parsing
-class SentimentAnalysis(BaseModel):
-    """Structured output for sentiment analysis."""
-    sentiment: str = Field(..., description="Positive, Negative, or Neutral")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
-    reasoning: str = Field(..., description="Explanation of the sentiment")
+class StatusResponse(BaseModel):
+    """Response mejorado para endpoint status - Día 4."""
+    status: str
+    message: str
+    project: str
+    week: int
+    features: List[str]
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
-                "sentiment": "Positive",
-                "confidence": 0.95,
-                "reasoning": "The text expresses happiness and satisfaction."
+                "status": "ok",
+                "message": "Server running asynchronously",
+                "project": "Price Optimization System",
+                "week": 1,
+                "features": ["chat", "sessions", "streaming", "json-logging"]
             }
         }
-
+    )
