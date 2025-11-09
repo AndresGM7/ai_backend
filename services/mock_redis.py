@@ -3,121 +3,110 @@ Redis Mock para desarrollo sin Redis instalado
 Este módulo simula Redis para desarrollo local cuando no tienes Redis disponible
 """
 from typing import Dict, List, Optional, Any
-import json
 from datetime import datetime, timedelta
+import re
 
 
 class MockRedis:
-    """Mock de Redis para desarrollo local - Soporta operaciones síncronas y asíncronas"""
+    """Mock de Redis (API síncrona compatible con redis-py)."""
 
     def __init__(self):
         self._data: Dict[str, Any] = {}
         self._expiry: Dict[str, datetime] = {}
 
-    # Métodos síncronos para compatibilidad con redis-py
+    # Métodos síncronos
     def ping(self) -> bool:
-        """Simula ping de Redis (síncrono)"""
         return True
 
     def set(self, key: str, value: Any, ex: Optional[int] = None) -> bool:
-        """Simula SET de Redis (síncrono)"""
         self._data[key] = value
         if ex:
             self._expiry[key] = datetime.now() + timedelta(seconds=ex)
         return True
 
     def setex(self, key: str, time: int, value: Any) -> bool:
-        """Simula SETEX de Redis (síncrono)"""
         self._data[key] = value
         self._expiry[key] = datetime.now() + timedelta(seconds=time)
         return True
 
     def get(self, key: str) -> Optional[str]:
-        """Simula GET de Redis (síncrono)"""
         if key in self._expiry and datetime.now() > self._expiry[key]:
-            del self._data[key]
-            del self._expiry[key]
+            # Expirado
+            self._data.pop(key, None)
+            self._expiry.pop(key, None)
             return None
         return self._data.get(key)
 
     def delete(self, key: str) -> int:
-        """Simula DELETE de Redis (síncrono)"""
-        if key in self._data:
-            del self._data[key]
-            if key in self._expiry:
-                del self._expiry[key]
-            return 1
-        return 0
+        existed = 1 if key in self._data else 0
+        self._data.pop(key, None)
+        self._expiry.pop(key, None)
+        return existed
 
     def keys(self, pattern: str) -> List[str]:
-        """Simula KEYS de Redis (síncrono)"""
-        import re
         pattern_regex = pattern.replace('*', '.*')
         return [k for k in self._data.keys() if re.match(pattern_regex, k)]
 
-    # Métodos asíncronos para compatibilidad con redis.asyncio
+
+class AsyncMockRedis:
+    """Mock de Redis (API asíncrona compatible con redis.asyncio)."""
+
+    def __init__(self):
+        self._data: Dict[str, Any] = {}
+        self._expiry: Dict[str, datetime] = {}
+
+    # Métodos asíncronos
     async def ping(self) -> bool:
-        """Simula ping de Redis"""
         return True
 
     async def set(self, key: str, value: Any, ex: Optional[int] = None) -> bool:
-        """Simula SET de Redis"""
         self._data[key] = value
         if ex:
             self._expiry[key] = datetime.now() + timedelta(seconds=ex)
         return True
 
     async def get(self, key: str) -> Optional[str]:
-        """Simula GET de Redis"""
         if key in self._expiry and datetime.now() > self._expiry[key]:
-            del self._data[key]
-            del self._expiry[key]
+            # Expirado
+            self._data.pop(key, None)
+            self._expiry.pop(key, None)
             return None
         return self._data.get(key)
 
     async def delete(self, key: str) -> int:
-        """Simula DELETE de Redis"""
-        if key in self._data:
-            del self._data[key]
-            if key in self._expiry:
-                del self._expiry[key]
-            return 1
-        return 0
+        existed = 1 if key in self._data else 0
+        self._data.pop(key, None)
+        self._expiry.pop(key, None)
+        return existed
 
     async def rpush(self, key: str, *values) -> int:
-        """Simula RPUSH de Redis"""
         if key not in self._data:
             self._data[key] = []
         self._data[key].extend(values)
         return len(self._data[key])
 
     async def lrange(self, key: str, start: int, end: int) -> List[str]:
-        """Simula LRANGE de Redis"""
         if key not in self._data:
             return []
         lst = self._data[key]
         if end == -1:
             return lst[start:]
-        return lst[start:end+1]
+        return lst[start:end + 1]
 
     async def keys(self, pattern: str) -> List[str]:
-        """Simula KEYS de Redis"""
-        import re
         pattern_regex = pattern.replace('*', '.*')
         return [k for k in self._data.keys() if re.match(pattern_regex, k)]
 
     async def expire(self, key: str, seconds: int) -> bool:
-        """Simula EXPIRE de Redis"""
         if key in self._data:
             self._expiry[key] = datetime.now() + timedelta(seconds=seconds)
             return True
         return False
 
     async def close(self):
-        """Simula cierre de conexión"""
         pass
 
 
 async def get_mock_redis():
-    """Retorna una instancia de MockRedis"""
-    return MockRedis()
+    """Retorna una instancia de AsyncMockRedis."""
+    return AsyncMockRedis()
