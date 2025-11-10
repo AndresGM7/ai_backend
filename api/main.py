@@ -1,19 +1,19 @@
-"""FastAPI main application - Sistema de Optimización de Precios."""
+"""FastAPI main application - Price Optimization System."""
 import logging
 import json
 import time
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api.routes import chat, stream
+from api.routes import chat, stream, pricing
 from models.schemas import StatusResponse
 
 
 # ============================================
-# JSON Logging para mejor observabilidad
+# JSON logging for observability
 # ============================================
 class JsonFormatter(logging.Formatter):
-    """Formateador de logs en JSON para mejor observabilidad."""
+    """JSON log formatter for better observability."""
 
     def format(self, record):
         payload = {
@@ -26,14 +26,14 @@ class JsonFormatter(logging.Formatter):
             "line": record.lineno
         }
 
-        # Agregar exception info si existe
+        # Add exception info if present
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
 
         return json.dumps(payload)
 
 
-# Configurar logging con JSON formatter
+# Configure logging with JSON formatter
 handler = logging.StreamHandler()
 handler.setFormatter(JsonFormatter())
 
@@ -49,10 +49,10 @@ app = FastAPI(
 
 
 # ============================================
-# Día 5: Middleware de medición de latencia
+# Request latency middleware
 # ============================================
 
-# Almacenamiento de métricas (en producción usar Prometheus)
+# In-memory metrics (for production, prefer Prometheus)
 latency_metrics = {
     "requests": [],
     "p50": 0,
@@ -64,26 +64,23 @@ latency_metrics = {
 
 @app.middleware("http")
 async def measure_latency(request: Request, call_next):
-    """
-    Middleware para medir latencia de requests - Día 5.
-    Calcula P50, P95, P99 y promedio.
-    """
+    """Middleware that measures request latency and computes basic stats."""
     start_time = time.perf_counter()
 
-    # Procesar request
+    # Process request
     response = await call_next(request)
 
-    # Calcular latencia
-    latency = (time.perf_counter() - start_time) * 1000  # en ms
+    # Calculate latency
+    latency = (time.perf_counter() - start_time) * 1000  # in ms
 
-    # Almacenar métrica
+    # Store metric
     latency_metrics["requests"].append(latency)
 
-    # Mantener solo últimas 1000 requests
+    # Keep only latest 1000 requests
     if len(latency_metrics["requests"]) > 1000:
         latency_metrics["requests"] = latency_metrics["requests"][-1000:]
 
-    # Calcular percentiles si tenemos suficientes datos
+    # Calculate percentiles if we have enough data
     if len(latency_metrics["requests"]) >= 10:
         sorted_latencies = sorted(latency_metrics["requests"])
         n = len(sorted_latencies)
@@ -93,24 +90,36 @@ async def measure_latency(request: Request, call_next):
         latency_metrics["p99"] = sorted_latencies[int(n * 0.99)]
         latency_metrics["avg"] = sum(sorted_latencies) / n
 
-    # Agregar header con latencia
+    # Add header with latency
     response.headers["X-Process-Time"] = f"{latency:.2f}ms"
 
-    # Log si la latencia es alta
+    # Log if latency is high
     if latency > 200:
         logger.warning(f"High latency detected: {latency:.2f}ms for {request.url.path}")
 
     return response
 
 
-# Incluir routers
+# Include routers
 app.include_router(chat.router, prefix="/api", tags=["Chat"])
 app.include_router(stream.router, prefix="/api", tags=["Streaming"])
+app.include_router(pricing.router, prefix="/api", tags=["Pricing"])
+
+
+@app.get("/")
+async def root():
+    """Root endpoint with quick links."""
+    return {
+        "message": "AI Backend running",
+        "docs": "/docs",
+        "status": "/status",
+        "api": "/api"
+    }
 
 
 @app.get("/status", response_model=StatusResponse)
 async def status():
-    """Status endpoint con response model tipado - Día 4."""
+    """Typed status endpoint."""
     logger.info("status_check")
     return StatusResponse(
         status="ok",
@@ -123,10 +132,7 @@ async def status():
 
 @app.get("/metrics")
 async def get_metrics():
-    """
-    Endpoint de métricas - Día 5.
-    Retorna latencias P50, P95, P99 y promedio.
-    """
+    """Return latency percentiles and basic health info."""
     return {
         "latency_ms": {
             "p50": round(latency_metrics["p50"], 2),

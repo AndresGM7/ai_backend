@@ -1,4 +1,4 @@
-"""Tests para streaming endpoints - Día 3."""
+"""Tests para endpoints de streaming."""
 import pytest
 from fastapi.testclient import TestClient
 

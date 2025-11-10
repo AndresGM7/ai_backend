@@ -1,14 +1,14 @@
-"""Pydantic models for request/response validation - Día 4."""
+"""Pydantic models for request/response validation."""
 from typing import List, Optional, Dict
 from pydantic import BaseModel, Field, ConfigDict
 
 
 # ============================================
-# Día 4: Modelos base con validación
+# Modelos base con validación
 # ============================================
 
 class ChatRequest(BaseModel):
-    """Request model para chat endpoint - Día 4."""
+    """Request model para chat endpoint."""
     message: str = Field(..., min_length=1, max_length=1000, description="Mensaje del usuario")
 
     model_config = ConfigDict(
@@ -21,7 +21,7 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    """Response model para chat endpoint - Día 4."""
+    """Response model para chat endpoint."""
     response: str = Field(..., description="Respuesta del sistema")
     session_len: int = Field(..., ge=0, description="Longitud del historial de sesión")
     user_id: str = Field(..., description="ID del usuario")
@@ -61,6 +61,7 @@ class PriceOptimizationRequest(BaseModel):
     cost: float = Field(..., gt=0, description="Costo del producto")
     elasticity: Optional[float] = Field(None, lt=0, description="Elasticidad de precio (negativa)")
     target_margin: Optional[float] = Field(0.3, ge=0, le=1, description="Margen objetivo (0-1)")
+    demand_factor: Optional[float] = Field(None, gt=0, description="Factor A de demanda (Q = A * P^e) para estimar demanda y revenue")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -84,6 +85,7 @@ class PriceOptimizationResponse(BaseModel):
     estimated_revenue: Optional[float] = Field(None, description="Revenue estimado")
     profit_margin: float = Field(..., description="Margen de ganancia (%)")
     recommendation: str = Field(..., description="Recomendación en lenguaje natural")
+    demand_factor: Optional[float] = Field(None, description="Factor A usado para estimar demanda")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -101,6 +103,63 @@ class PriceOptimizationResponse(BaseModel):
 
 
 # ============================================
+# Modelos de Elasticidad
+# ============================================
+
+class PriceQuantity(BaseModel):
+    price: float = Field(..., gt=0, description="Precio unitario")
+    quantity: float = Field(..., gt=0, description="Cantidad vendida")
+
+
+class ElasticityComputeRequest(BaseModel):
+    product_id: Optional[str] = Field(None, description="ID del producto o categoría")
+    observations: List[PriceQuantity] = Field(..., min_length=3, description="Lista de observaciones (precio, cantidad)")
+
+
+class ElasticityComputeResponse(BaseModel):
+    product_id: Optional[str]
+    elasticity: float
+    intercept: float
+    demand_factor: float
+    r2: float
+    n_points: int
+    warnings: List[str] = []
+
+
+# ============================================
+# Cross Elasticity Models
+# ============================================
+class CrossElasticityObservation(BaseModel):
+    own_price: float = Field(..., gt=0)
+    own_quantity: float = Field(..., gt=0)
+    competitor_price: float = Field(..., gt=0)
+
+
+class CrossElasticityComputeRequest(BaseModel):
+    product_id: Optional[str] = None
+    observations: List[CrossElasticityObservation] = Field(..., min_length=4)
+
+
+class CrossElasticityComputeResponse(BaseModel):
+    product_id: Optional[str]
+    own_elasticity: float
+    cross_elasticity: float
+    intercept: float
+    r2: float
+    n_points: int
+    warnings: List[str] = []
+
+# ============================================
+# Data upload
+# ============================================
+class DataUploadResponse(BaseModel):
+    rows_loaded: int
+    grouped_levels: int
+    group_sample: List[Dict[str, float]]
+    warnings: List[str] = []
+
+
+# ============================================
 # Modelos de Sistema
 # ============================================
 
@@ -112,7 +171,7 @@ class HealthResponse(BaseModel):
 
 
 class StatusResponse(BaseModel):
-    """Response mejorado para endpoint status - Día 4."""
+    """Response mejorado para endpoint status."""
     status: str
     message: str
     project: str

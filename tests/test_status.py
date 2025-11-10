@@ -1,4 +1,4 @@
-"""Tests para el endpoint de status - Día 3 mejorado."""
+"""Tests para el endpoint de status."""
 import pytest
 from fastapi.testclient import TestClient
 

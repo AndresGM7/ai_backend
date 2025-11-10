@@ -1,4 +1,4 @@
-"""Redis manager for session and conversation storage - Día 2."""
+"""Redis manager for session and conversation storage."""
 import os
 import json
 from typing import Any, Dict, List, Optional
@@ -9,12 +9,14 @@ from redis.asyncio import Redis
 # Configuración de Redis desde variables de entorno
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")  # opcional
 
-# Cliente Redis síncrono (para funciones simples del Día 2)
+# Cliente Redis síncrono (utilizado para operaciones simples)
 try:
     r = redis.Redis(
         host=REDIS_HOST,
         port=REDIS_PORT,
+        password=REDIS_PASSWORD,
         db=0,
         decode_responses=True,
         socket_connect_timeout=5
@@ -39,9 +41,9 @@ def save_session(user_id: str, message: Dict[str, Any], ttl: int = 3600):
     """
     try:
         r.setex(user_id, ttl, json.dumps(message))
-    except Exception as e:
+    except Exception:
         # Para MockRedis que no tiene setex síncrono
-        r.set(user_id, json.dumps(message))
+        r.set(user_id, json.dumps(message), ex=ttl)
 
 
 def get_session(user_id: str) -> Dict[str, Any]:
@@ -124,7 +126,7 @@ class RedisManager:
         key = f"{self.cache_prefix}{cache_key}"
         value = await self.redis.get(key)
 
-        if value and value.startswith(("{", "[")):
+        if value and isinstance(value, str) and value.startswith(("{", "[")):
             try:
                 return json.loads(value)
             except json.JSONDecodeError:

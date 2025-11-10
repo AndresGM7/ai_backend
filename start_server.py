@@ -19,7 +19,7 @@ if __name__ == "__main__":
     print("  📚 Swagger Docs: http://127.0.0.1:8000/docs")
     print("  ✅ Status:       http://127.0.0.1:8000/status")
     print()
-    print("  📅 Semana 1 - Día 1: Backend Asíncrono + Endpoint Status")
+    print("  🚀 Características clave: API async, sesiones Redis, streaming, pricing & elasticidad")
     print("=" * 70)
     print()
 

@@ -1,4 +1,4 @@
-"""Chat routes - Día 2/4: Session management con Redis + Pydantic validation."""
+"""Chat routes: session management with Redis and Pydantic validation."""
 from fastapi import APIRouter, HTTPException
 import logging
 
@@ -12,16 +12,14 @@ logger = logging.getLogger("ai_backend")
 @router.post("/chat/{user_id}", response_model=ChatResponse)
 async def chat(user_id: str, chat_request: ChatRequest):
     """
-    Endpoint de chat con persistencia de sesión en Redis.
-
-    Día 4: Añadida validación Pydantic y response model tipado.
+    Chat endpoint with session persistence in Redis and Pydantic validation.
 
     Args:
-        user_id: Identificador único del usuario
-        chat_request: ChatRequest con validación Pydantic
+        user_id: Unique user identifier
+        chat_request: Validated request model
 
     Returns:
-        ChatResponse con estructura tipada
+        Typed ChatResponse
     """
     try:
         # Recuperar sesión existente
@@ -51,15 +49,7 @@ async def chat(user_id: str, chat_request: ChatRequest):
 
 @router.get("/chat/{user_id}/history")
 async def get_chat_history(user_id: str):
-    """
-    Obtiene el historial de chat de un usuario.
-
-    Args:
-        user_id: Identificador único del usuario
-
-    Returns:
-        Historial completo de la sesión
-    """
+    """Get full chat history for a user."""
     try:
         session = get_session(user_id)
         history = session.get("history", [])
@@ -77,15 +67,7 @@ async def get_chat_history(user_id: str):
 
 @router.delete("/chat/{user_id}/history")
 async def clear_chat_history(user_id: str):
-    """
-    Limpia el historial de chat de un usuario.
-
-    Args:
-        user_id: Identificador único del usuario
-
-    Returns:
-        Confirmación de eliminación
-    """
+    """Clear a user's chat history."""
     try:
         # Guardar sesión vacía
         save_session(user_id, {}, ttl=1)  # TTL corto para eliminar pronto

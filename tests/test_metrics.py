@@ -1,4 +1,4 @@
-"""Tests para métricas de latencia - Día 5."""
+"""Tests para métricas de latencia."""
 import pytest
 from fastapi.testclient import TestClient
 
@@ -71,7 +71,9 @@ def test_health_status_based_on_latency():
     # Si P95 < 300ms, debería ser healthy
     if data["latency_ms"]["p95"] < 300:
         assert data["status"] == "healthy"
-"""Tests para validación Pydantic - Día 4."""
+
+
+"""Tests para validación Pydantic."""
 import pytest
 from fastapi.testclient import TestClient
 
@@ -156,4 +158,3 @@ def test_openapi_schema_includes_models():
     # Verificar que ChatRequest está definido
     schemas = schema["components"]["schemas"]
     assert "ChatRequest" in schemas or "Body_chat" in str(schemas)
-
