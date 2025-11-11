@@ -152,11 +152,31 @@ class CrossElasticityComputeResponse(BaseModel):
 # ============================================
 # Data upload
 # ============================================
+class GroupSampleItem(BaseModel):
+    category: str = Field(..., description="Nombre del grupo (categoría o default)")
+    observations: int = Field(..., ge=0, description="Número de observaciones válidas")
+
+
+class GroupElasticityItem(BaseModel):
+    """Detailed group item including elasticity estimates."""
+    category: str = Field(..., description="Nombre del grupo (categoría or default)")
+    observations: int = Field(..., ge=0, description="Número de observaciones válidas")
+    elasticity: Optional[float] = Field(None, description="Estimated own-price elasticity (slope)")
+    intercept: Optional[float] = Field(None, description="Regression intercept on log-log scale")
+    demand_factor: Optional[float] = Field(None, description="Demand factor A in Q = A * P^e")
+    r2: float = Field(..., description="R^2 of the log-log regression")
+    n_points: int = Field(..., description="Number of points used in regression")
+    warnings: List[str] = Field(default_factory=list, description="Warnings from estimation")
+
+
 class DataUploadResponse(BaseModel):
     rows_loaded: int
     grouped_levels: int
-    group_sample: List[Dict[str, float]]
+    # Provide detailed elasticity per group (if any)
+    group_sample: List[GroupElasticityItem]
     warnings: List[str] = []
+    # URL to download processed CSV with per-product elasticity/price columns (if generated)
+    download_url: Optional[str] = None
 
 
 # ============================================
@@ -189,3 +209,27 @@ class StatusResponse(BaseModel):
             }
         }
     )
+
+
+class LinearOptimizationRequest(BaseModel):
+    """Request to compute revenue-maximizing price for a linear demand model.
+
+    Provide either alpha and beta directly (alpha + beta * P) or a list of observations
+    to estimate them.
+    """
+    product_id: Optional[str] = None
+    current_price: float = Field(..., gt=0)
+    alpha: Optional[float] = Field(None, description="Intercept of linear demand Q = alpha + beta*P")
+    beta: Optional[float] = Field(None, description="Slope (dQ/dP) of linear demand")
+    observations: Optional[List[PriceQuantity]] = Field(None, description="Optional observations to estimate linear demand (price, quantity)")
+
+
+class LinearOptimizationResponse(BaseModel):
+    product_id: Optional[str]
+    optimal_price: Optional[float]
+    current_price: float
+    estimated_demand: Optional[float]
+    estimated_revenue: Optional[float]
+    elasticity_at_optimal: Optional[float]
+    recommendation: str
+    warnings: List[str] = []

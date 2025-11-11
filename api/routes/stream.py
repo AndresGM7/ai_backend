@@ -1,4 +1,4 @@
-"""Streaming endpoints - Día 3."""
+"""Streaming endpoints."""
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 import asyncio
@@ -9,7 +9,7 @@ logger = logging.getLogger("ai_backend")
 
 
 async def _stream_text(text: str):
-    """Generator para streaming de texto palabra por palabra."""
+    """Async generator that streams text by chunks."""
     for chunk in text.split():
         yield chunk + " "
         await asyncio.sleep(0.15)
@@ -17,15 +17,7 @@ async def _stream_text(text: str):
 
 @router.get("/stream")
 async def stream():
-    """
-    Endpoint de streaming demo usando Server-Sent Events.
-
-    Día 3: Demuestra capacidad de streaming para respuestas largas.
-    Útil para integración con LLMs que responden token por token.
-
-    Returns:
-        StreamingResponse con texto palabra por palabra
-    """
+    """Text streaming demo using an async generator."""
     logger.info("Streaming endpoint called")
     return StreamingResponse(
         _stream_text("Hola Andrés, streaming works! Sistema de optimización de precios funcionando correctamente."),
@@ -35,11 +27,7 @@ async def stream():
 
 @router.get("/stream-json")
 async def stream_json():
-    """
-    Streaming de eventos JSON (SSE - Server-Sent Events).
-
-    Útil para enviar múltiples actualizaciones al cliente en tiempo real.
-    """
+    """JSON event streaming (SSE)."""
     import json
 
     async def generate():
@@ -57,4 +45,3 @@ async def stream_json():
 
     logger.info("JSON streaming endpoint called")
     return StreamingResponse(generate(), media_type="text/event-stream")
-

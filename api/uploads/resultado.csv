@@ -1,0 +1,7 @@
+categoria;qty;prc;fecha;elasticidad_producto;elasticidad_categoria;volumen_promedio_producto;volumen_promedio_categoria;elasticidad_relativa;volumen_relativo;precio_optimo_lineal;demanda_optima_lineal;revenue_optimo_lineal;elasticidad_optima_lineal;n_obs_producto
+Electronics;5;100;2025-01-01;N/A;-1,51;0,0;4,0;N/A;0,0;100.0;5.0;500.0;-1.0;0
+Electronics;4;120;2025-01-02;N/A;-1,51;0,0;4,0;N/A;0,0;100.0;5.0;500.0;-1.0;0
+Electronics;3;140;2025-01-03;N/A;-1,51;0,0;4,0;N/A;0,0;100.0;5.0;500.0;-1.0;0
+Ropa;6;60;2025-01-01;N/A;2,23;0,0;5,0;N/A;0,0;N/A;N/A;N/A;N/A;0
+Ropa;5;55;2025-01-02;N/A;2,23;0,0;5,0;N/A;0,0;N/A;N/A;N/A;N/A;0
+Ropa;4;50;2025-01-03;N/A;2,23;0,0;5,0;N/A;0,0;N/A;N/A;N/A;N/A;0

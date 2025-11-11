@@ -195,8 +195,117 @@ def calculate_cross_elasticity(
     }
 
 
+def estimate_linear_demand(price_quantity: List[Tuple[float, float]]) -> Dict[str, object]:
+    """Estimate linear demand Q = alpha + beta * P using OLS.
+
+    Returns dict with:
+      alpha: intercept
+      beta: slope (dQ/dP)
+      r2: coefficient of determination
+      n_points: number of valid points
+      warnings: list of warning strings
+
+    Filters invalid (price <=0, quantity < 0) observations. Requires >=3 points for stability.
+    """
+    warnings: List[str] = []
+    cleaned: List[Tuple[float, float]] = [
+        (p, q) for p, q in price_quantity if p > 0 and q >= 0
+    ]
+    n_points = len(cleaned)
+    if n_points < 3:
+        return {
+            "alpha": float("nan"),
+            "beta": float("nan"),
+            "r2": 0.0,
+            "n_points": n_points,
+            "warnings": ["Insufficient data points (need >=3)"]
+        }
+
+    # Prepare X and y
+    X_vals = [p for p, _ in cleaned]
+    y_vals = [q for _, q in cleaned]
+
+    # If sklearn not available, do manual OLS for y = alpha + beta * x
+    if LinearRegression is None:
+        mean_x = sum(X_vals) / n_points
+        mean_y = sum(y_vals) / n_points
+        num = sum((x - mean_x) * (y - mean_y) for x, y in zip(X_vals, y_vals))
+        den = sum((x - mean_x) ** 2 for x in X_vals)
+        if den == 0:
+            warnings.append("No price variance; linear demand undefined")
+            return {
+                "alpha": float("nan"),
+                "beta": float("nan"),
+                "r2": 0.0,
+                "n_points": n_points,
+                "warnings": warnings
+            }
+        beta = num / den
+        alpha = mean_y - beta * mean_x
+        # R2 manual
+        ss_tot = sum((y - mean_y) ** 2 for y in y_vals)
+        ss_res = sum((y - (alpha + beta * x)) ** 2 for x, y in zip(X_vals, y_vals))
+        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
+        return {
+            "alpha": alpha,
+            "beta": beta,
+            "r2": r2,
+            "n_points": n_points,
+            "warnings": warnings
+        }
+
+    # Use sklearn LinearRegression
+    X = [[x] for x in X_vals]
+    y = y_vals
+    model = LinearRegression()
+    model.fit(X, y)
+    beta = float(model.coef_[0])
+    alpha = float(model.intercept_)
+    r2 = float(model.score(X, y))
+
+    if abs(beta) < 1e-6:
+        warnings.append("Slope near zero; demand appears flat")
+    if r2 < 0.3:
+        warnings.append("Low R2; linear demand estimate may be unreliable")
+
+    return {
+        "alpha": alpha,
+        "beta": beta,
+        "r2": r2,
+        "n_points": n_points,
+        "warnings": warnings
+    }
+
+
+def optimal_price_from_linear(alpha: float, beta: float) -> Dict[str, object]:
+    """Compute revenue-maximizing price for linear demand Q = alpha + beta*P.
+
+    Analytical optimum: P* = -alpha / (2 * beta)  (requires beta < 0 and P* > 0)
+    Returns dict with p_star (float or nan), valid (bool), warning messages if any.
+    """
+    warnings: List[str] = []
+    try:
+        if beta >= 0:
+            warnings.append("Beta >= 0 (non-negative slope): linear demand does not decline with price")
+            return {"p_star": float("nan"), "valid": False, "warnings": warnings}
+        denom = 2.0 * beta
+        if abs(denom) < 1e-12:
+            warnings.append("Beta too small; division unstable")
+            return {"p_star": float("nan"), "valid": False, "warnings": warnings}
+        p_star = -alpha / denom
+        if p_star <= 0:
+            warnings.append("Computed optimal price not positive")
+            return {"p_star": float("nan"), "valid": False, "warnings": warnings}
+        return {"p_star": float(p_star), "valid": True, "warnings": warnings}
+    except Exception as exc:
+        warnings.append(f"Error computing optimal price: {exc}")
+        return {"p_star": float("nan"), "valid": False, "warnings": warnings}
+
+
 __all__ = [
     "optimize_price",
     "calculate_elasticity",
     "calculate_cross_elasticity",
+    "estimate_linear_demand",
+    "optimal_price_from_linear",
 ]
