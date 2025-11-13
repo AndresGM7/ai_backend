@@ -1,8 +1,8 @@
 """Pricing routes: price optimization and elasticity endpoints."""
-from pathlib import Path
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
+from datetime import datetime
 
 from models.schemas import (
     PriceOptimizationRequest,
@@ -16,6 +16,8 @@ from models.schemas import (
     LinearOptimizationResponse,
 )
 from services.pricing_optimizer import optimize_price, calculate_elasticity, calculate_cross_elasticity, estimate_linear_demand, optimal_price_from_linear
+from services.product_strategy import analyze_product
+from services.report_generator import generate_pricing_report
 
 router = APIRouter()
 
@@ -352,13 +354,24 @@ async def upload_data(file: UploadFile = File(...)) -> DataUploadResponse:
     df_out["volumen_promedio_categoria"] = 0.0
     df_out["elasticidad_relativa"] = None
     df_out["volumen_relativo"] = None
-    # Linear optimization output columns
-    df_out["precio_optimo_lineal"] = None
-    df_out["demanda_optima_lineal"] = None
-    df_out["revenue_optimo_lineal"] = None
-    df_out["elasticidad_optima_lineal"] = None
+    # New columns for strategic analysis
+    df_out["recomendacion_precio"] = None
+    df_out["rol_producto"] = None
+    df_out["estrategia_recomendada"] = None
+    df_out["estrategia_resumen"] = None
     # number of observations per product (helps debug why elasticity may be N/A)
     df_out["n_obs_producto"] = 0
+
+    def summarize_by_role(role: Optional[str]) -> str:
+        """Short strategy summary per role (<=10 words)."""
+        mapping = {
+            "Generador de ganancias": "Subir precio gradual, maximizar margen",
+            "Estabilizador de ingresos": "Mantener premium, nicho leal",
+            "Generador de trafico": "Precios competitivos y promociones",
+            "Promesa de valor": "Precio competitivo, crecer volumen",
+            "Sin clasificar": "Recolectar mas datos",
+        }
+        return mapping.get(role or "", "Estrategia general")
 
     for idx, row in df_out.iterrows():
         prod = row[name_col] if name_col and pd.notna(row.get(name_col)) else None
@@ -428,48 +441,80 @@ async def upload_data(file: UploadFile = File(...)) -> DataUploadResponse:
         df_out.at[idx, "elasticidad_relativa"] = elasticidad_rel
         df_out.at[idx, "volumen_relativo"] = volumen_rel
         df_out.at[idx, "n_obs_producto"] = int(p_stats.get("n_points", 0))
-        # linear outputs: prefer product-level values, fallback to category-level
-        p_lin_p = p_stats.get("lin_p_star") if p_stats else None
-        p_lin_d = p_stats.get("lin_est_demand") if p_stats else None
-        p_lin_r = p_stats.get("lin_revenue") if p_stats else None
-        c_lin_p = c_stats.get("lin_p_star") if c_stats else None
-        c_lin_d = c_stats.get("lin_est_demand") if c_stats else None
-        c_lin_r = c_stats.get("lin_revenue") if c_stats else None
-        final_p = p_lin_p if p_lin_p is not None else c_lin_p
-        final_d = p_lin_d if p_lin_d is not None else c_lin_d
-        final_r = p_lin_r if p_lin_r is not None else c_lin_r
-        df_out.at[idx, "precio_optimo_lineal"] = (round(final_p, 2) if final_p is not None else "N/A")
-        df_out.at[idx, "demanda_optima_lineal"] = (round(final_d, 2) if final_d is not None else "N/A")
-        df_out.at[idx, "revenue_optimo_lineal"] = (round(final_r, 2) if final_r is not None else "N/A")
-        # elasticidad en el punto óptimo si disponible
-        try:
-            e_opt = None
-            if final_p is not None and final_d not in (None, 0):
-                e_opt = ( (p_stats.get("lin_beta") if p_stats and p_stats.get("lin_beta") is not None else c_stats.get("lin_beta")) * final_p ) / final_d
-            df_out.at[idx, "elasticidad_optima_lineal"] = (round(e_opt, 2) if e_opt is not None else "N/A")
-        except Exception:
-            df_out.at[idx, "elasticidad_optima_lineal"] = "N/A"
 
-    # Before exporting, ensure numeric columns are rounded to 2 decimals for clean output
-    def safe_round_val(v):
-        try:
-            if v is None:
-                return v
-            if isinstance(v, (int,)):
-                return v
-            if isinstance(v, (float,)) and v == v:
-                return round(v, 2)
-            return v
-        except Exception:
-            return v
+        # Use the analyze_product function to determine price recommendation, role, and strategy
+        el_rel_num = elasticidad_rel if isinstance(elasticidad_rel, (int, float)) else None
+        vol_rel_num = volumen_rel if isinstance(volumen_rel, (int, float)) else None
 
+        price_rec, role, strategy = analyze_product(el_rel_num, vol_rel_num)
+
+        df_out.at[idx, "recomendacion_precio"] = price_rec
+        df_out.at[idx, "rol_producto"] = role
+        df_out.at[idx, "estrategia_recomendada"] = strategy
+        df_out.at[idx, "estrategia_resumen"] = summarize_by_role(role)
+
+    # Round numeric columns for internal consistency
     for c in df_out.columns:
-        df_out[c] = df_out[c].apply(safe_round_val)
+        if pd.api.types.is_numeric_dtype(df_out[c].dtype):
+            df_out[c] = df_out[c].apply(lambda v: (round(float(v), 2) if v == v and v is not None else v))
 
-    # Save single resultado.csv file (remove old CSVs first). Export using semicolon separator
-    # and comma as decimal separator to match locales that use comma decimals and avoid collision with comma decimals.
+    # Prepare an export dataframe where all numeric values are strings with two decimals
+    df_export = df_out.copy()
+
+    # Generate comprehensive pricing report with modern visualizations
     uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
     uploads_dir.mkdir(parents=True, exist_ok=True)
+
+    # Use the modern report generator
+    generate_pricing_report(df_out, uploads_dir, cat_col)
+
+    # Collect generated assets to expose via API
+    image_names = [
+        "roles_plot.png",
+        "roles_counts.png",
+        "price_recommendations.png",
+        "distribution_by_role.png",
+    ]
+    report_names = [
+        "summary_stats.csv",
+        "overall_summary.csv",
+    ]
+
+    image_urls: List[str] = []
+    report_urls: List[str] = []
+    for name in image_names:
+        if (uploads_dir / name).exists():
+            image_urls.append(f"/api/data/download/{name}")
+    for name in report_names:
+        if (uploads_dir / name).exists():
+            report_urls.append(f"/api/data/download/{name}")
+
+    def format_for_locale(v):
+        """Format values for CSV export using comma as decimal separator and two decimals."""
+        try:
+            if v is None:
+                return ""
+            if isinstance(v, str) and v.strip().upper() == "N/A":
+                return "N/A"
+            if isinstance(v, (int, float)):
+                if isinstance(v, float) and (v != v):
+                    return ""
+                return f"{v:.2f}".replace('.', ',')
+            try:
+                fv = float(str(v))
+                if fv != fv:
+                    return ""
+                return f"{fv:.2f}".replace('.', ',')
+            except Exception:
+                return str(v)
+        except Exception:
+            return ""
+
+    # Apply locale formatting to all columns
+    for c in df_export.columns:
+        df_export[c] = df_export[c].apply(format_for_locale)
+
+    # Save resultado.csv file
     try:
         for p in uploads_dir.glob("*.csv"):
             try:
@@ -481,8 +526,7 @@ async def upload_data(file: UploadFile = File(...)) -> DataUploadResponse:
 
     try:
         resultado_path = uploads_dir / "resultado.csv"
-        # Use semicolon separator and comma decimal to be compatible with locales expecting comma decimals
-        df_out.to_csv(resultado_path, index=False, sep=';', decimal=',')
+        df_export.to_csv(resultado_path, index=False, sep=';')
         download_url = f"/api/data/download/{resultado_path.name}"
     except Exception:
         download_url = None
@@ -494,7 +538,7 @@ async def upload_data(file: UploadFile = File(...)) -> DataUploadResponse:
     if cost_col is None:
         warnings.append("No cost column detected; optimal_price not computed")
 
-    # Build group_sample matching the response model (detailed elasticity per category)
+    # Build group_sample matching the response model
     group_sample: List[Dict[str, Any]] = []
     for cat, stats in category_stats.items():
         group_sample.append({
@@ -514,33 +558,54 @@ async def upload_data(file: UploadFile = File(...)) -> DataUploadResponse:
         group_sample=group_sample,
         warnings=warnings,
         download_url=download_url,
+        image_urls=image_urls,
+        report_urls=report_urls,
     )
 
 
 @router.get("/data/download/{filename}")
 async def download_uploaded_file(filename: str):
-    """Serve previously generated CSV files from the uploads/ directory.
-
-    Example: GET /api/data/download/resultado.csv
-    """
+    """Serve previously generated CSV files and images from the uploads/ directory with cache-busting headers."""
     uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
     file_path = uploads_dir / filename
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(path=file_path, filename=filename)
+
+    # Determine media type based on extension
+    if filename.lower().endswith('.csv'):
+        media_type = "text/csv"
+    elif filename.lower().endswith('.png'):
+        media_type = "image/png"
+    else:
+        media_type = "application/octet-stream"
+
+    # Add timestamp to force fresh download and prevent caching
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    name_parts = filename.rsplit('.', 1)
+    if len(name_parts) == 2:
+        download_filename = f"{name_parts[0]}_{timestamp}.{name_parts[1]}"
+    else:
+        download_filename = f"{filename}_{timestamp}"
+
+    return FileResponse(
+        path=file_path,
+        filename=download_filename,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @router.post("/optimize-price-linear", response_model=LinearOptimizationResponse)
 async def optimize_price_linear_endpoint(payload: LinearOptimizationRequest) -> LinearOptimizationResponse:
-    """Compute revenue-maximizing price under a linear demand assumption Q = alpha + beta * P.
-
-    The request may supply alpha and beta directly, or a list of observations to estimate them.
-    """
+    """Compute revenue-maximizing price under a linear demand assumption Q = alpha + beta * P."""
     try:
         warnings = []
         alpha = payload.alpha
         beta = payload.beta
-        # If observations provided and alpha/beta missing, estimate
         if (alpha is None or beta is None) and payload.observations:
             obs_tuples = [(o.price, o.quantity) for o in payload.observations]
             est = estimate_linear_demand(obs_tuples)
@@ -551,7 +616,6 @@ async def optimize_price_linear_endpoint(payload: LinearOptimizationRequest) -> 
                 warnings.append("Insufficient observations to estimate linear demand")
         if alpha is None or beta is None:
             raise HTTPException(status_code=400, detail="Provide alpha and beta or at least 3 observations to estimate them")
-
         res = optimal_price_from_linear(alpha, beta)
         warnings.extend(res.get("warnings", []))
         if not res.get("valid", False):
@@ -568,24 +632,21 @@ async def optimize_price_linear_endpoint(payload: LinearOptimizationRequest) -> 
             )
 
         p_star = float(res["p_star"])
-        # Estimated demand at p_star
         estimated_demand = alpha + beta * p_star
         if estimated_demand < 0:
             warnings.append("Estimated demand at optimal price is negative; check demand parameters")
             estimated_demand = 0.0
         estimated_revenue = p_star * estimated_demand
-        # Elasticity at P* (for linear demand should be -1 analytically)
+
         try:
             elasticity_at_optimal = (beta * p_star) / (alpha + beta * p_star) if (alpha + beta * p_star) != 0 else None
         except Exception:
             elasticity_at_optimal = None
 
-        # Recommendation message using elasticity interpretation
         delta_pct = ((p_star - payload.current_price) / payload.current_price) * 100.0
         action = "Sube" if delta_pct > 0 else ("Baja" if delta_pct < 0 else "Mantén")
         recommendation = f"{action} precio {abs(round(delta_pct, 2)):.2f}% para maximizar ingresos (precio óptimo calculado)."
 
-        # Add theory-based guidance explicitly
         if elasticity_at_optimal is not None:
             e = elasticity_at_optimal
             if e < -1:

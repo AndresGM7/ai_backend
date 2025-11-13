@@ -25,8 +25,10 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "api.main:app",
-        host="127.0.0.1",
+        host="0.0.0.0",  # Cambiar a 0.0.0.0 para permitir conexiones externas
         port=8000,
         reload=True,
-        log_level="info"
+        log_level="info",
+        access_log=False,  # Deshabilitar logs de acceso para mejorar rendimiento
+        workers=1  # Un solo worker en desarrollo
     )

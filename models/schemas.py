@@ -177,6 +177,10 @@ class DataUploadResponse(BaseModel):
     warnings: List[str] = []
     # URL to download processed CSV with per-product elasticity/price columns (if generated)
     download_url: Optional[str] = None
+    # URLs for generated images (if available)
+    image_urls: List[str] = []
+    # URLs for generated report CSVs (if available)
+    report_urls: List[str] = []
 
 
 # ============================================
